@@ -154,11 +154,12 @@ function countTotalOccupied(matrix) {
 // const r1 = stepRules(r0)
 // console.table(r1)
 
-
+console.time('findStableMatrix')
 const finalMatrix = findStableMatrix(input)
+console.timeEnd('findStableMatrix')
 const result = countTotalOccupied(finalMatrix)
 
-console.table(finalMatrix)
+
 console.log({result})
 
 
