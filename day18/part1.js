@@ -1,0 +1,196 @@
+const fs = require('fs');
+
+const stringToInput = str => str.trim().split('\n').map(line => line.trim().split(''))
+
+const input = stringToInput(fs.readFileSync('./input.txt', 'utf8'))
+
+const testInput = stringToInput(`
+1 + (2 * 3) + (4 * (5 + 6))
+2 * 3 + (4 * 5)
+5 + (8 * 3 + 9 + 3 * 4 * 3)
+5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))
+((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2
+`)
+
+
+function parseFirstLevel(str) {
+    const result = []
+
+    let current = ''
+    let countCurrentParens = 0
+
+    str.split('').forEach((c, index, arr) => {
+        if (c === '(') {
+            if (countCurrentParens === 0) {
+                result.push(current)
+                current = ''
+            } else {
+                current += c
+            }
+
+            countCurrentParens++
+
+        } else if (c === ')') {
+            if (countCurrentParens > 1) {
+                current += c
+            } else if (countCurrentParens === 1) {
+                result.push(current)
+
+                current = ''
+                countCurrentParens = 0
+            } else {
+                throw new Error('Unbalanced Parentheses')
+            }
+
+        } else {
+            current += c
+        }
+
+        if (index === arr.length - 1 && current !== '') {
+            result.push(current)
+            current = ''
+        }
+    })
+
+    return result
+}
+
+/**
+ *
+ * @param {string} str
+ * @param {number} start
+ * @returns {{token: Object|null, end: number}}
+ */
+function getToken(str, start = 0) {
+    if (start >= str.length) return {token: null, end: start}
+
+
+    const firstChar = str.charAt(start)
+
+    if (!Number.isNaN(parseInt(firstChar))) {
+        const matched = /^\d+/.exec(str)
+        return {
+            token: {
+                type: 'Number',
+                value: parseInt(matched[0])
+            },
+            end: start + matched[0].length
+        }
+    }
+
+    if (firstChar === '+') {
+        return {
+            token: {
+                type: '+',
+            },
+            end: start + 1
+        }
+    }
+
+    if (firstChar === '-') {
+        return {
+            token: {
+                type: '-',
+            },
+            end: start + 1
+        }
+    }
+
+    if (firstChar === '*') {
+        return {
+            token: {
+                type: '*',
+            },
+            end: start + 1
+        }
+    }
+
+    if (firstChar === '(') {
+        let pos = start + 1
+        let openedParens = 1
+
+
+        while (openedParens !== 0) {
+            if (pos >= str.length) throw new SyntaxError('Unclosed Parens')
+
+            if (str.charAt(pos) === '(') openedParens++
+            else if (str.charAt(pos) === ')') openedParens--
+
+            pos++
+        }
+
+        return {
+            token: {
+                type: 'Expression',
+                value: str.substring(1, pos - 1),
+            },
+            end: pos
+        }
+    }
+
+    throw new SyntaxError('Token not recognized')
+}
+
+/**
+ * Parses an expression and returns an Abstract Syntax Trees
+ * @param {string} str
+ * @returns {Object}
+ */
+function parse(str) {
+    const {token: firstToken, end: firstEnd} = getToken(str)
+    const {token: secondToken, end: secondEnd} = getToken(str, firstEnd)
+
+    // Base case
+    if (firstToken.type === 'Number' && secondToken === null) {
+        // type and value
+        return firstToken
+    }
+
+    if (firstToken.type === 'Expression') {
+        if (secondToken === null) return parse(firstToken.value)
+
+        return {
+            type: secondToken.type,
+            leftChild: parse(firstToken.value),
+            rightChild: parse(str.substring(secondEnd)),
+        }
+    }
+
+    if (['+', '-', '*'].includes(secondToken.type)) {
+        return {
+            type: secondToken.type,
+            leftChild: firstToken.type === 'Number' ? firstToken : parse(firstToken.value),
+            rightChild: parse(str.substring(secondEnd)),
+        }
+    }
+
+    throw new SyntaxError(`Invalid syntax: 
+        First token is '${firstToken && (firstToken.value || firstToken.type)}',
+        Second token is '${secondToken && (secondToken.value || secondToken.type)}'
+    `)
+}
+
+function buildAST(str) {
+    // remove all empty spaces and parse the expression
+    return parse(str.replace(/ /g, ''))
+}
+
+function evaluate(str) {
+    const evaluateNode = ({type, value, leftChild, rightChild}) => {
+        if (type === 'Number') return value
+        if(type === '+') return evaluateNode(leftChild) + evaluateNode(rightChild)
+        if(type === '-') return evaluateNode(leftChild) - evaluateNode(rightChild)
+        if(type === '*') return evaluateNode(leftChild) * evaluateNode(rightChild)
+
+        throw new Error(`Invalid node type: ${type}`)
+    }
+
+    const ast = buildAST(str)
+    return evaluateNode(ast)
+}
+
+const arr = testInput
+
+console.log('end')
+
+module.exports = {parseFirstLevel, getToken, parse, stringToInput, evaluate}
