@@ -1,16 +1,8 @@
 const fs = require('fs');
 
-const stringToInput = str => str.trim().split('\n').map(line => line.trim().split(''))
+const stringToInput = str => str.trim().split('\n')
 
 const input = stringToInput(fs.readFileSync('./input.txt', 'utf8'))
-
-const testInput = stringToInput(`
-1 + (2 * 3) + (4 * (5 + 6))
-2 * 3 + (4 * 5)
-5 + (8 * 3 + 9 + 3 * 4 * 3)
-5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))
-((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2
-`)
 
 
 function parseFirstLevel(str) {
@@ -68,7 +60,7 @@ function getToken(str, start = 0) {
     const firstChar = str.charAt(start)
 
     if (!Number.isNaN(parseInt(firstChar))) {
-        const matched = /^\d+/.exec(str)
+        const matched = /^\d+/.exec(str.substring(start))
         return {
             token: {
                 type: 'Number',
@@ -122,7 +114,7 @@ function getToken(str, start = 0) {
         return {
             token: {
                 type: 'Expression',
-                value: str.substring(1, pos - 1),
+                value: str.substring(start+1, pos - 1),
             },
             end: pos
         }
@@ -175,21 +167,146 @@ function buildAST(str) {
     return parse(str.replace(/ /g, ''))
 }
 
-function evaluate(str) {
-    const evaluateNode = ({type, value, leftChild, rightChild}) => {
-        if (type === 'Number') return value
-        if(type === '+') return evaluateNode(leftChild) + evaluateNode(rightChild)
-        if(type === '-') return evaluateNode(leftChild) - evaluateNode(rightChild)
-        if(type === '*') return evaluateNode(leftChild) * evaluateNode(rightChild)
+// function evaluate(str) {
+//     const evaluateNode = ({type, value, leftChild, rightChild}) => {
+//         if (type === 'Number') return value
+//
+//         const isRightChildOperation = ['+', '-', '*'].includes(rightChild.type)
+//
+//         if (type === '+') {
+//             if (!isRightChildOperation) return evaluateNode(leftChild) + evaluateNode(rightChild)
+//
+//             const newNode = {
+//                 type: rightChild.type,
+//                 leftChild: {
+//                     type: 'Number',
+//                     value: evaluateNode(leftChild) + evaluateNode(rightChild.leftChild)
+//                 },
+//                 rightChild: rightChild.rightChild
+//             }
+//
+//             return evaluateNode(newNode)
+//         }
+//
+//         if (type === '-') {
+//             if (!isRightChildOperation) return evaluateNode(leftChild) - evaluateNode(rightChild)
+//
+//             const newNode = {
+//                 type: rightChild.type,
+//                 leftChild: {
+//                     type: 'Number',
+//                     value: evaluateNode(leftChild) - evaluateNode(rightChild.leftChild)
+//                 },
+//                 rightChild: rightChild.rightChild
+//             }
+//
+//             return evaluateNode(newNode)
+//         }
+//
+//         if (type === '*') {
+//             if (!isRightChildOperation) return evaluateNode(leftChild) * evaluateNode(rightChild)
+//
+//             const newNode = {
+//                 type: rightChild.type,
+//                 leftChild: {
+//                     type: 'Number',
+//                     value: evaluateNode(leftChild) * evaluateNode(rightChild.leftChild)
+//                 },
+//                 rightChild: rightChild.rightChild
+//             }
+//
+//             return evaluateNode(newNode)
+//         }
+//
+//         // if(type === '+') return evaluateNode(leftChild) + evaluateNode(rightChild)
+//         // if(type === '-') return evaluateNode(leftChild) - evaluateNode(rightChild)
+//         // if(type === '*') return evaluateNode(leftChild) * evaluateNode(rightChild)
+//
+//         throw new Error(`Invalid node type: ${type}`)
+//     }
+//
+//     const ast = buildAST(str)
+//     return evaluateNode(ast)
+// }
 
-        throw new Error(`Invalid node type: ${type}`)
+function evaluate(str) {
+    str = str.replace(/ /g, '')
+
+    const isOperation = type => ['+', '-', '*'].includes(type)
+    const operation = {
+        '+': (left, right) => left + right,
+        '-': (left, right) => left - right,
+        '*': (left, right) => left * right,
     }
 
-    const ast = buildAST(str)
-    return evaluateNode(ast)
+
+    let pos = 0
+    let acc = 0
+
+    while (pos < str.length) {
+        const {token: firstToken, end: firstEnd} = getToken(str, pos)
+        pos = firstEnd
+
+        if (pos >= str.length)
+            return firstToken.type === 'Number'
+                ? firstToken.value
+                : firstToken.type === 'Expression'
+                    ? evaluate(firstToken.value)
+                    : new Error('Final token is invalid')
+
+        const {token: secondToken, end: secondEnd} = getToken(str, pos)
+        pos = secondEnd
+
+        if (isOperation(firstToken.type)) {
+            const leftValue = acc
+            const rightValue = secondToken.type === 'Number'
+                ? secondToken.value
+                : secondToken.type === 'Expression'
+                    ? evaluate(secondToken.value)
+                    : new Error('Left side is not a value, nor an expression')
+
+
+            const result = operation[firstToken.type](leftValue, rightValue)
+            acc = result
+        } else {
+            const {token: thirdToken, end: thirdEnd} = getToken(str, pos)
+            pos = thirdEnd
+
+            const leftValue = firstToken.type === 'Number'
+                ? firstToken.value
+                : firstToken.type === 'Expression'
+                    ? evaluate(firstToken.value)
+                    : new Error('Left side is not a value, nor an expression')
+
+            const rightValue = thirdToken.type === 'Number'
+                ? thirdToken.value
+                : thirdToken.type === 'Expression'
+                    ? evaluate(thirdToken.value)
+                    : null
+
+            if (isOperation(secondToken.type)) {
+                const result = operation[secondToken.type](leftValue, rightValue)
+                acc = result
+            } else {
+                throw new Error('Invalid second token type')
+            }
+        }
+
+
+    }
+
+    return acc
+
 }
 
-const arr = testInput
+const arr = input
+
+console.time()
+const partialResults = arr.map(str => evaluate(str))
+const result = partialResults.reduce((acc, curr) => acc + curr, 0)
+console.timeEnd()
+
+console.log({result})
 
 console.log('end')
 

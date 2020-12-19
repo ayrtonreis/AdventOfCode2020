@@ -1,5 +1,5 @@
 const assert = require('assert')
-const {parseFirstLevel, getToken, parse, evaluate} = require('./part1')
+const {parseFirstLevel, getToken, parse, evaluate} = require('./part2')
 
 
 const tests = [
@@ -217,22 +217,27 @@ const tests = [
         // Test 3
         expression = '1 + 2 * 3 + 4 * 5 + 6'
         result = evaluate(expression)
-        assert.strictEqual(result, 71)
+        assert.strictEqual(result, 231)
 
         // Test 4
-        expression = '1 + (2 * 3)'
-        result = evaluate(expression)
-        assert.strictEqual(result, 7)
-
-        // Test 5
         expression = '1 + (2 * 3) + (4 * (5 + 6))'
         result = evaluate(expression)
         assert.strictEqual(result, 51)
 
+        // Test 5
+        expression = '5 + (8 * 3 + 9 + 3 * 4 * 3)'
+        result = evaluate(expression)
+        assert.strictEqual(result, 1445)
+
         // Test 6
+        expression = '5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))'
+        result = evaluate(expression)
+        assert.strictEqual(result, 669060)
+
+        // Test 7
         expression = '((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2'
         result = evaluate(expression)
-        assert.strictEqual(result, 13632)
+        assert.strictEqual(result, 23340)
     }
 ]
 
